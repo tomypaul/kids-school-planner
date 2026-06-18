@@ -2,7 +2,6 @@
 
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
-import Image from "next/image";
 
 export default function Header() {
   const { data: session } = useSession();
@@ -28,7 +27,8 @@ export default function Header() {
               className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700"
             >
               {session.user.image ? (
-                <Image
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
                   src={session.user.image}
                   alt={session.user.name ?? "User"}
                   width={28}
