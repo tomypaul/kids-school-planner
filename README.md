@@ -16,7 +16,7 @@ A self-hosted PWA that plugs directly into your phone's **Share Menu**. Long-pre
 WhatsApp message
       ↓  (Android Share / paste on desktop)
   Kids Planner PWA
-      ↓  (Gemini 2.5 Flash)
+      ↓  (Gemini 2.5 Flash — with auto model rotation on quota)
   Extracted events (title, date, subject, type)
       ↓  (Google Calendar API)
   Annabel's School 🟣  /  Adam's School 🔵
@@ -27,11 +27,12 @@ WhatsApp message
 ## Features
 
 - **Android Share Menu integration** — share directly from WhatsApp without leaving the app
-- **AI-powered extraction** — Gemini 2.5 Flash understands English, Malayalam, and Hindi
+- **AI-powered extraction** — Gemini understands English, Malayalam, and Hindi
 - **Relative date resolution** — "tomorrow", "coming Friday", "next Monday" all resolved correctly
 - **Multi-child support** — separate colour-coded Google Calendars per child
 - **Review before saving** — edit titles, dates, or kid assignment before it hits the calendar
 - **Desktop / iPhone** — paste messages manually; full PWA for iPhone Add-to-Home-Screen
+- **Auto model rotation** — if one Gemini model hits quota, silently falls back to the next
 - **$0/month** — Vercel free tier + Gemini free tier + Upstash free tier
 
 ---
@@ -40,13 +41,13 @@ WhatsApp message
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 15 (App Router) |
+| Framework | Next.js 16 (App Router, Turbopack) |
 | Hosting | Vercel Free |
-| Auth | Auth.js v5 — Google OAuth with offline access |
-| AI | Google Gemini 2.5 Flash API |
+| Auth | Auth.js v5 — Google OAuth with offline access + token refresh |
+| AI | Gemini 2.5 Flash (free tier, auto-rotates on quota) |
 | Calendar | Google Calendar API v3 |
 | Storage | Upstash Redis — OAuth tokens + kid profiles |
-| PWA | `@ducanh2912/next-pwa` + Web Share Target API |
+| PWA | Manual service worker + Web Share Target API |
 
 ---
 
@@ -55,10 +56,11 @@ WhatsApp message
 ```
 Browser/Android
     │
-    ├── POST /api/share  ← Android Share Target (multipart/form-data)
-    │       └── store text in Redis (10 min TTL) → redirect /review?token=…
+    ├── POST /api/share  ← Android Share Target (multipart/form-data, unauthenticated)
+    │       └── store text in Redis (10 min TTL, 10K char cap) → redirect /review?token=…
     │
-    ├── POST /api/extract  ← Gemini 2.5 Flash
+    ├── POST /api/extract  ← Gemini (auth-guarded, 60s timeout)
+    │       └── tries gemini-2.5-flash → 2.5-flash-lite → 3.1-flash-lite on quota errors
     │       └── returns structured JSON events with resolved absolute dates
     │
     └── POST /api/calendar/events  ← Google Calendar API v3
@@ -92,9 +94,13 @@ Go to [console.cloud.google.com](https://console.cloud.google.com)
 
 Go to [aistudio.google.com](https://aistudio.google.com)
 
-1. Click **Get API key** → Create API key
-2. Free tier: **1,500 requests/day** on Gemini 2.5 Flash — more than enough for personal use
+> **Important:** Create a **new project without billing enabled** in AI Studio. Free-tier quota only applies to projects on the free tier. Keys linked to billing-enabled Cloud projects use prepay credits, which run out.
+
+1. In AI Studio, click **API Keys** → **Create API key** → create in a **new project** (not an existing Cloud project)
+2. Check **Rate Limits** in the left sidebar — confirm `Gemini 2.5 Flash` shows a non-zero RPD quota (~20/day)
 3. Copy the **API Key**
+
+**Free tier quota for Gemini 2.5 Flash:** 20 requests/day, 5 RPM. The app auto-rotates through fallback models if this is hit — sufficient for personal family use.
 
 ### 3. Upstash Redis — Token Storage
 
@@ -119,7 +125,7 @@ Copy `.env.local.example` to `.env.local` and fill in all values:
 | `AUTH_TRUST_HOST` | Set to `true` |
 | `UPSTASH_REDIS_REST_URL` | Upstash dashboard |
 | `UPSTASH_REDIS_REST_TOKEN` | Upstash dashboard |
-| `GEMINI_API_KEY` | Google AI Studio |
+| `GEMINI_API_KEY` | Google AI Studio (billing-free project) |
 | `NEXTAUTH_URL` | `http://localhost:3000` locally, your Vercel URL in production |
 
 ---
@@ -173,6 +179,8 @@ The Share Menu integration only works when the app is installed as a PWA.
 4. Open the installed app once (so the browser registers the Share Target)
 5. Go to WhatsApp → long-press a message → **Share** → **Kids Planner** ✓
 
+> **Note:** WhatsApp's "Forward" option shares to WhatsApp contacts only. Use **Copy → Paste** in the app textarea, or Android's system Share sheet if available.
+
 ---
 
 ## Day-to-Day Usage
@@ -203,7 +211,7 @@ npm run build
 npm run start  # Listens on port 3000
 ```
 
-Behind an nginx reverse proxy, or on a GCP Cloud Run container, or an Oracle Cloud ARM VM — it works the same way. Just set all the environment variables.
+Behind an nginx reverse proxy, on GCP Cloud Run, or an Oracle Cloud ARM VM — it works the same way. Just set all the environment variables.
 
 ---
 
@@ -224,7 +232,7 @@ kids-class-planner/
 │   └── api/
 │       ├── auth/[...nextauth]/route.ts
 │       ├── share/route.ts    # Android Share Target (POST multipart)
-│       ├── extract/route.ts  # Gemini extraction
+│       ├── extract/route.ts  # Gemini extraction (60s timeout, model rotation)
 │       ├── kids/route.ts     # GET/DELETE kids
 │       └── calendar/
 │           ├── create/route.ts   # Create Google Calendar per kid
@@ -235,7 +243,7 @@ kids-class-planner/
 │   └── EventCard.tsx         # Editable event tile
 └── lib/
     ├── auth.ts               # Auth.js v5 config + token refresh
-    ├── gemini.ts             # Gemini 2.5 Flash extraction
+    ├── gemini.ts             # Gemini extraction with model auto-rotation
     ├── google-calendar.ts    # Calendar API helpers
     ├── redis.ts              # Upstash client + kid profile CRUD
     └── colors.ts             # Kid color palette
