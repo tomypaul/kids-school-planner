@@ -24,7 +24,15 @@ export async function POST(req: NextRequest) {
 
   const tz = timezone ?? "Asia/Kolkata";
   const today = new Date().toLocaleDateString("en-CA", { timeZone: tz });
-  const events = await extractEvents(text, today, tz);
 
-  return NextResponse.json({ events });
+  try {
+    const events = await extractEvents(text, today, tz);
+    return NextResponse.json({ events });
+  } catch (err) {
+    console.error("Gemini extraction error:", err);
+    return NextResponse.json(
+      { error: "Gemini could not process the message. Please try again." },
+      { status: 500 }
+    );
+  }
 }

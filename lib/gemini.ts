@@ -66,7 +66,9 @@ ${text}`;
   });
 
   try {
-    const raw = JSON.parse(response.text ?? "[]") as RawEvent[];
+    const text = response.text;
+    if (!text) return [];
+    const raw = JSON.parse(text) as RawEvent[];
     return raw.filter(
       (e) => e.title && e.date && /^\d{4}-\d{2}-\d{2}$/.test(e.date)
     );
