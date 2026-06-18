@@ -25,7 +25,12 @@ export async function POST(req: NextRequest) {
   }
 
   const tz = timezone ?? "Asia/Kolkata";
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+  let today: string;
+  try {
+    today = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+  } catch {
+    return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
+  }
 
   try {
     const events = await extractEvents(text, today, tz);

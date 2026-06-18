@@ -9,6 +9,9 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.email || !session.accessToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (session.error === "RefreshTokenError") {
+    return NextResponse.json({ error: "Session expired, please sign in again" }, { status: 401 });
+  }
 
   const { events }: { events: ExtractedEvent[] } = await req.json();
   if (!events?.length) {
