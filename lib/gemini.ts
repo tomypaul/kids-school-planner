@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 
@@ -13,25 +13,6 @@ export interface ExtractedEvent {
 
 type RawEvent = Omit<ExtractedEvent, "kidId">;
 
-const responseSchema = {
-  type: Type.ARRAY,
-  items: {
-    type: Type.OBJECT,
-    properties: {
-      subject: { type: Type.STRING, description: "Subject name, e.g. Maths, English, EVS. Use 'General' if unclear." },
-      title: { type: Type.STRING, description: "Short, clear calendar event title in English." },
-      description: { type: Type.STRING, description: "Additional notes, items to bring, or requirements." },
-      date: { type: Type.STRING, description: "Event date in YYYY-MM-DD format." },
-      type: {
-        type: Type.STRING,
-        enum: ["Test", "Activity", "Homework", "Event"],
-        description: "Category of the event.",
-      },
-    },
-    required: ["subject", "title", "description", "date", "type"],
-  },
-};
-
 export async function extractEvents(
   text: string,
   today: string,
@@ -39,7 +20,7 @@ export async function extractEvents(
 ): Promise<RawEvent[]> {
   const prompt = `You are a school calendar assistant.
 Today is ${today}. Timezone: ${timezone}.
-The message may be in English, Malayalam, or Hindi — translate all output field values to English.
+The message may be in English, Malayalam, or Hindi — translate ALL output field values to English.
 
 Resolve ALL relative dates to absolute YYYY-MM-DD format:
 - "tomorrow" → today + 1 day
@@ -48,10 +29,18 @@ Resolve ALL relative dates to absolute YYYY-MM-DD format:
 - "next Monday" → Monday of NEXT week (never the current week)
 - "this Monday" → Monday of the current week
 - "today" → ${today}
-- "after school" or time-of-day references → use that same date, no time component
+- Explicit dates like "19 June", "23 June", "18th June" → resolve using current year
 
-Extract every upcoming task, test, activity, or event from this school message.
-If no events are found, return an empty array.
+Extract every UPCOMING test, activity, or event that has a specific date.
+Skip items that are already completed or have no date.
+If nothing upcoming is found, return an empty array [].
+
+Return ONLY a valid JSON array. Each element must have exactly these keys:
+- subject: string (e.g. "Maths", "English", "EVS", "Malayalam", "Hindi", "General")
+- title: string (short calendar event title in English)
+- description: string (notes, items to bring, etc. — empty string if none)
+- date: string (YYYY-MM-DD)
+- type: one of "Test", "Activity", "Homework", "Event"
 
 Message:
 ${text}`;
@@ -61,7 +50,6 @@ ${text}`;
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     config: {
       responseMimeType: "application/json",
-      responseSchema,
     },
   });
 
