@@ -36,9 +36,10 @@ export async function POST(req: NextRequest) {
     const events = await extractEvents(text, today, tz);
     return NextResponse.json({ events });
   } catch (err) {
-    console.error("Gemini extraction error:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("Gemini extraction error:", msg);
     return NextResponse.json(
-      { error: "Gemini could not process the message. Please try again." },
+      { error: `Gemini error: ${msg}` },
       { status: 500 }
     );
   }
