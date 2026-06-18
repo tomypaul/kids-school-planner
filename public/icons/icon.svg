@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#4f46e5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect width="512" height="512" rx="96" ry="96" fill="url(#bg)"/>
+
+  <!-- Open book -->
+  <!-- Left page -->
+  <path d="M256 152 C256 152 180 160 148 176 L148 360 C180 344 256 340 256 340 Z"
+        fill="white" opacity="0.95"/>
+  <!-- Right page -->
+  <path d="M256 152 C256 152 332 160 364 176 L364 360 C332 344 256 340 256 340 Z"
+        fill="white" opacity="0.80"/>
+  <!-- Spine line -->
+  <line x1="256" y1="152" x2="256" y2="340" stroke="#6366f1" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Left page lines -->
+  <line x1="180" y1="220" x2="245" y2="214" stroke="#6366f1" stroke-width="7" stroke-linecap="round" opacity="0.35"/>
+  <line x1="178" y1="248" x2="243" y2="242" stroke="#6366f1" stroke-width="7" stroke-linecap="round" opacity="0.35"/>
+  <line x1="176" y1="276" x2="241" y2="270" stroke="#6366f1" stroke-width="7" stroke-linecap="round" opacity="0.35"/>
+
+  <!-- Right page lines -->
+  <line x1="332" y1="220" x2="267" y2="214" stroke="#4f46e5" stroke-width="7" stroke-linecap="round" opacity="0.35"/>
+  <line x1="334" y1="248" x2="269" y2="242" stroke="#4f46e5" stroke-width="7" stroke-linecap="round" opacity="0.35"/>
+  <line x1="336" y1="276" x2="271" y2="270" stroke="#4f46e5" stroke-width="7" stroke-linecap="round" opacity="0.35"/>
+
+  <!-- Calendar badge (bottom right) -->
+  <rect x="308" y="308" width="120" height="112" rx="20" fill="#fbbf24"/>
+  <!-- Calendar header bar -->
+  <rect x="308" y="308" width="120" height="36" rx="20" fill="#f59e0b"/>
+  <rect x="308" y="326" width="120" height="18" fill="#f59e0b"/>
+  <!-- Checkmark on calendar -->
+  <polyline points="328,374 348,394 392,350"
+            fill="none" stroke="white" stroke-width="14"
+            stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
