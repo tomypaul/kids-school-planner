@@ -13,6 +13,20 @@ export interface ExtractedEvent {
 
 type RawEvent = Omit<ExtractedEvent, "kidId">;
 
+// Models tried in order when quota is hit. Check AI Studio → Rate Limits for current quotas.
+// To add a model: { id: "gemini-x.y-flash", thinkingBudget: 0 }
+// thinkingBudget: 0 disables thinking for speed (only applies to models that support it)
+const MODELS = [
+  { id: "gemini-2.5-flash",      thinkingBudget: 0 as number | undefined }, // 20 RPD
+  { id: "gemini-2.5-flash-lite", thinkingBudget: undefined               }, // 20 RPD
+  { id: "gemini-3.1-flash-lite", thinkingBudget: undefined               }, // 500 RPD
+];
+
+function isQuotaError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED");
+}
+
 export async function extractEvents(
   text: string,
   today: string,
@@ -45,23 +59,40 @@ Return ONLY a valid JSON array. Each element must have exactly these keys:
 Message:
 ${text}`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    config: {
-      responseMimeType: "application/json",
-      thinkingConfig: { thinkingBudget: 0 }, // disable thinking for speed (~2s vs ~30s)
-    },
-  });
+  let lastError: unknown;
 
-  try {
-    const text = response.text;
-    if (!text) return [];
-    const raw = JSON.parse(text) as RawEvent[];
-    return raw.filter(
-      (e) => e.title && e.date && /^\d{4}-\d{2}-\d{2}$/.test(e.date)
-    );
-  } catch {
-    return [];
+  for (const model of MODELS) {
+    try {
+      const config: Record<string, unknown> = { responseMimeType: "application/json" };
+      if (model.thinkingBudget !== undefined) {
+        config.thinkingConfig = { thinkingBudget: model.thinkingBudget };
+      }
+
+      const response = await ai.models.generateContent({
+        model: model.id,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config,
+      });
+
+      try {
+        const responseText = response.text;
+        if (!responseText) return [];
+        const raw = JSON.parse(responseText) as RawEvent[];
+        return raw.filter(
+          (e) => e.title && e.date && /^\d{4}-\d{2}-\d{2}$/.test(e.date)
+        );
+      } catch {
+        return [];
+      }
+    } catch (err) {
+      if (isQuotaError(err)) {
+        lastError = err;
+        console.warn(`[gemini] ${model.id} quota exceeded, trying next model…`);
+        continue;
+      }
+      throw err; // auth error, bad request, etc — don't rotate, just fail
+    }
   }
+
+  throw lastError ?? new Error("All Gemini models hit quota");
 }
