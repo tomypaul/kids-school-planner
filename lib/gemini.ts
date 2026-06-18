@@ -46,10 +46,11 @@ Message:
 ${text}`;
 
   const response = await ai.models.generateContent({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.5-flash",
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     config: {
       responseMimeType: "application/json",
+      thinkingConfig: { thinkingBudget: 0 }, // disable thinking for speed (~2s vs ~30s)
     },
   });
 
