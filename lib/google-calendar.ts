@@ -28,10 +28,10 @@ export async function createKidCalendar(
 
   const calendarId = cal.id!;
 
-  // Set color on the calendar list entry
-  await calendar.calendarList.update({
+  // Use patch (not update/PUT) so only colorId changes; selected stays true
+  await calendar.calendarList.patch({
     calendarId,
-    requestBody: { colorId },
+    requestBody: { colorId, selected: true },
   });
 
   return calendarId;
