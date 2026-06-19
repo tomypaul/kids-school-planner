@@ -56,6 +56,13 @@ export async function insertEvent(
       description: `Subject: ${event.subject}\n\n${event.description}`,
       start: { date: event.date },
       end: { date: endDateStr },
+      reminders: {
+        useDefault: false,
+        overrides: [
+          { method: "popup", minutes: 900 }, // 9 AM the day before
+          { method: "popup", minutes: 300 }, // 7 PM the night before
+        ],
+      },
     },
   });
 
