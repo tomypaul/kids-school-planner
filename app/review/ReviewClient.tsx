@@ -100,16 +100,18 @@ export default function ReviewClient({ kids, pendingText, pendingToken }: Props)
     setSaving(true);
     setError("");
     try {
-      // Expand all recurring events into individual occurrences before saving
-      const expanded = events.flatMap((event, i) =>
+      // For recurring events, attach the until date — the API creates one
+      // Google Calendar recurring series (RRULE) so the user can delete/edit
+      // the whole series at once, and no rate-limit issues from bulk inserts.
+      const toSave = events.map((event, i) =>
         event.recurring && event.frequency
-          ? expandRecurring(event, getUntil(event, i))
-          : [event]
+          ? { ...event, until: getUntil(event, i) }
+          : event
       );
       const res = await fetch("/api/calendar/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ events: expanded }),
+        body: JSON.stringify({ events: toSave }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to save events");

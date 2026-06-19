@@ -37,6 +37,12 @@ export async function createKidCalendar(
   return calendarId;
 }
 
+const FREQ_MAP: Record<string, string> = {
+  daily: "DAILY",
+  weekly: "WEEKLY",
+  monthly: "MONTHLY",
+};
+
 export async function insertEvent(
   accessToken: string,
   calendarId: string,
@@ -49,6 +55,14 @@ export async function insertEvent(
   endDate.setDate(endDate.getDate() + 1);
   const endDateStr = endDate.toISOString().split("T")[0];
 
+  // Build RRULE for recurring events so the user gets a proper series in
+  // Google Calendar (edit/delete all occurrences at once) instead of
+  // hundreds of individual events that can't be managed as a group.
+  const recurrence =
+    event.recurring && event.frequency && event.until
+      ? [`RRULE:FREQ=${FREQ_MAP[event.frequency]};UNTIL=${event.until.replace(/-/g, "")}`]
+      : undefined;
+
   const { data } = await calendar.events.insert({
     calendarId,
     requestBody: {
@@ -56,6 +70,7 @@ export async function insertEvent(
       description: `Subject: ${event.subject}\n\n${event.description}`,
       start: { date: event.date },
       end: { date: endDateStr },
+      ...(recurrence ? { recurrence } : {}),
       reminders: {
         useDefault: false,
         overrides: [
