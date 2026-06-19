@@ -11,6 +11,7 @@ export interface ExtractedEvent {
   kidId: string;
   recurring?: boolean;
   frequency?: "daily" | "weekly" | "monthly";
+  until?: string; // YYYY-MM-DD — set by ReviewClient before saving; not from Gemini
 }
 
 type RawEvent = Omit<ExtractedEvent, "kidId">;
