@@ -29,6 +29,8 @@ WhatsApp message
 - **Android Share Menu integration** — share directly from WhatsApp without leaving the app
 - **AI-powered extraction** — Gemini understands English, Malayalam, and Hindi
 - **Relative date resolution** — "tomorrow", "coming Friday", "next Monday" all resolved correctly
+- **Recurring event detection** — "Swimming class every Monday" creates one Google Calendar series with an editable end date; delete or edit all occurrences at once
+- **Calendar reminders** — 9 AM and 7 PM the day before every event, automatically
 - **Multi-child support** — separate colour-coded Google Calendars per child
 - **Review before saving** — edit titles, dates, or kid assignment before it hits the calendar
 - **Desktop / iPhone** — paste messages manually; full PWA for iPhone Add-to-Home-Screen
@@ -64,7 +66,8 @@ Browser/Android
     │       └── returns structured JSON events with resolved absolute dates
     │
     └── POST /api/calendar/events  ← Google Calendar API v3
-            └── inserts all-day events into the child's calendar
+            └── inserts all-day events (or a recurring series via RRULE) into the child's calendar
+            └── 9 AM + 7 PM popup reminders set on every event
 ```
 
 ---
@@ -194,6 +197,9 @@ The Share Menu integration only works when the app is installed as a PWA.
 ### Desktop / iPhone
 1. Open the app → paste the message → select the child → **Extract & Schedule Events**
 2. Review events → **Add to Calendar**
+
+### Recurring events
+If Gemini detects a repeating schedule ("every Monday", "every Friday"), a purple panel appears below the event card showing the repeat frequency and a default end date (3 months out). Adjust the end date if needed — the count updates live. On save, a single Google Calendar recurring series is created (not individual events), so you can edit or delete the whole series at once from Google Calendar.
 
 ### First-time setup
 1. Sign in with Google → authorise Calendar access

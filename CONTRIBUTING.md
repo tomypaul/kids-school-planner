@@ -78,11 +78,12 @@ The repo includes `.env.local.example` listing every variable the app needs. Nev
 Before opening a PR, manually verify:
 
 - [ ] Sign in with Google — OAuth flow completes, no error
-- [ ] `/setup` — add a child, confirm Google Calendar appears in Google Calendar
+- [ ] `/setup` — add a child, confirm Google Calendar appears in Google Calendar (and in third-party apps like DigiCal within a minute of creation)
 - [ ] Home page — paste a test message with relative dates, click Extract
 - [ ] Review page — events appear with correct resolved dates, kid assignment correct
 - [ ] Edit a title and date on the review page — changes are preserved on save
-- [ ] "Add to Calendar" — events appear in the correct child's calendar
+- [ ] "Add to Calendar" — events appear in the correct child's calendar with 9 AM and 7 PM reminders the day before
+- [ ] Recurring message (e.g. "Swimming class every Monday") — review page shows purple recurring panel with editable until-date; after saving, Google Calendar shows one series ("Repeats weekly; until …"), not individual events
 - [ ] On Android (if applicable): install as PWA, share a message, confirm kid picker appears
 
 **Test message with relative dates (paste this on the home page):**
@@ -117,8 +118,12 @@ Activity day is day after tomorrow, children should wear house colours.
 - **Client components** (`HomeClient`, `ReviewClient`, `KidsClient`) handle all user interaction
 - **API routes** are all auth-guarded — they check `await auth()` before any logic; they also reject requests when `session.error === "RefreshTokenError"` (expired token)
 - **Gemini extraction** uses `responseMimeType: "application/json"` with a detailed prompt — no `responseSchema` (it caused empty responses on multilingual content)
+- **Day-of-week accuracy** — the prompt includes a 14-day day→date lookup table (pre-computed server-side) so Gemini reads the correct date for "every Monday" rather than computing it, which was error-prone
 - **Model auto-rotation** — `lib/gemini.ts` iterates through `MODELS` array and retries on 429/RESOURCE_EXHAUSTED; non-quota errors (auth failure, bad request) are rethrown immediately
 - **Relative dates** are resolved by Gemini given `today = YYYY-MM-DD` in the system prompt — no client-side date math
+- **Recurring events** — Gemini returns one event with `recurring: true` and `frequency`; `ReviewClient` shows an until-date picker; on save, the API creates a single Google Calendar recurring series using `RRULE:FREQ=WEEKLY;UNTIL=YYYYMMDD` (not individual events) so users can manage the whole series at once
+- **Calendar reminders** — every event gets `overrides: [{ method: "popup", minutes: 900 }, { method: "popup", minutes: 300 }]` (9 AM and 7 PM the day before)
+- **Calendar list sync** — `createKidCalendar` uses `calendarList.patch` with `selected: true` so newly created children's calendars sync to the device immediately and appear in third-party calendar apps
 - **Android Share Target** stores text in Redis with a 10-minute TTL and a 10,000-character cap; the review page resolves it by token; the endpoint is intentionally unauthenticated (OS share fires before the app can authenticate)
 - **Security headers** — CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy are set in `next.config.ts`
 
