@@ -13,6 +13,31 @@ interface Props {
   pendingToken?: string;
 }
 
+function addMonths(dateStr: string, months: number): string {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().split("T")[0];
+}
+
+function expandRecurring(event: ExtractedEvent, until: string): ExtractedEvent[] {
+  if (!event.recurring || !event.frequency) return [event];
+  const results: ExtractedEvent[] = [];
+  const current = new Date(event.date + "T00:00:00");
+  const end = new Date(until + "T00:00:00");
+  const { recurring: _r, frequency: _f, ...base } = event;
+  while (current <= end) {
+    results.push({ ...base, date: current.toISOString().split("T")[0] });
+    if (event.frequency === "weekly") current.setDate(current.getDate() + 7);
+    else if (event.frequency === "daily") current.setDate(current.getDate() + 1);
+    else current.setMonth(current.getMonth() + 1);
+  }
+  return results;
+}
+
+function countOccurrences(event: ExtractedEvent, until: string): number {
+  return expandRecurring(event, until).length;
+}
+
 export default function ReviewClient({ kids, pendingText, pendingToken }: Props) {
   const router = useRouter();
   const [events, setEvents] = useState<ExtractedEvent[]>([]);
@@ -20,10 +45,12 @@ export default function ReviewClient({ kids, pendingText, pendingToken }: Props)
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  // Maps event index → until date for recurring events
+  const [recurringUntil, setRecurringUntil] = useState<Record<number, string>>({});
 
   // Desktop path: read events from sessionStorage
   useEffect(() => {
-    if (pendingText) return; // Android path — wait for kid selection
+    if (pendingText) return;
     const stored = sessionStorage.getItem("review_events");
     if (stored) {
       try {
@@ -34,6 +61,16 @@ export default function ReviewClient({ kids, pendingText, pendingToken }: Props)
       }
     }
   }, [pendingText]);
+
+  function getUntil(event: ExtractedEvent, index: number): string {
+    return recurringUntil[index] ?? addMonths(event.date, 3);
+  }
+
+  // Total events that will be created after expanding recurring ones
+  const totalCount = events.reduce((sum, event, i) => {
+    if (!event.recurring || !event.frequency) return sum + 1;
+    return sum + countOccurrences(event, getUntil(event, i));
+  }, 0);
 
   async function extractForKid(kidId: string) {
     setLoading(true);
@@ -63,10 +100,16 @@ export default function ReviewClient({ kids, pendingText, pendingToken }: Props)
     setSaving(true);
     setError("");
     try {
+      // Expand all recurring events into individual occurrences before saving
+      const expanded = events.flatMap((event, i) =>
+        event.recurring && event.frequency
+          ? expandRecurring(event, getUntil(event, i))
+          : [event]
+      );
       const res = await fetch("/api/calendar/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ events }),
+        body: JSON.stringify({ events: expanded }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to save events");
@@ -85,7 +128,7 @@ export default function ReviewClient({ kids, pendingText, pendingToken }: Props)
         <div className="text-6xl mb-4">🎉</div>
         <h2 className="text-xl font-bold text-gray-900 mb-2">Added to Calendar!</h2>
         <p className="text-sm text-gray-500 mb-6">
-          {events.length} event{events.length !== 1 ? "s" : ""} added to Google Calendar.
+          {totalCount} event{totalCount !== 1 ? "s" : ""} added to Google Calendar.
         </p>
         <button
           onClick={() => router.push("/")}
@@ -156,15 +199,39 @@ export default function ReviewClient({ kids, pendingText, pendingToken }: Props)
 
       <div className="space-y-3">
         {events.map((event, i) => (
-          <EventCard
-            key={i}
-            event={event}
-            kids={kids}
-            onUpdate={(updated) =>
-              setEvents((prev) => prev.map((e, j) => (j === i ? updated : e)))
-            }
-            onDelete={() => setEvents((prev) => prev.filter((_, j) => j !== i))}
-          />
+          <div key={i}>
+            <EventCard
+              event={event}
+              kids={kids}
+              onUpdate={(updated) =>
+                setEvents((prev) => prev.map((e, j) => (j === i ? updated : e)))
+              }
+              onDelete={() => setEvents((prev) => prev.filter((_, j) => j !== i))}
+            />
+
+            {/* Recurring expansion panel */}
+            {event.recurring && event.frequency && (
+              <div className="rounded-b-xl border border-t-0 border-violet-200 bg-violet-50 px-4 py-3 -mt-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm text-violet-700 font-medium">
+                    Repeats every {event.frequency === "daily" ? "day" : event.frequency === "monthly" ? "month" : "week"} — until
+                  </span>
+                  <input
+                    type="date"
+                    value={getUntil(event, i)}
+                    min={event.date}
+                    onChange={(e) =>
+                      setRecurringUntil((prev) => ({ ...prev, [i]: e.target.value }))
+                    }
+                    className="text-sm border border-violet-200 rounded-lg px-2 py-1 bg-white focus:outline-none focus:border-violet-400"
+                  />
+                  <span className="text-sm text-violet-500 font-medium">
+                    → {countOccurrences(event, getUntil(event, i))} events
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
         ))}
       </div>
 
@@ -179,7 +246,7 @@ export default function ReviewClient({ kids, pendingText, pendingToken }: Props)
             Adding to Calendar…
           </>
         ) : (
-          `Add ${events.length} event${events.length !== 1 ? "s" : ""} to Calendar`
+          `Add ${totalCount} event${totalCount !== 1 ? "s" : ""} to Calendar`
         )}
       </button>
     </div>

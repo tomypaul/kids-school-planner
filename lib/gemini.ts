@@ -9,6 +9,8 @@ export interface ExtractedEvent {
   date: string;
   type: "Test" | "Activity" | "Homework" | "Event";
   kidId: string;
+  recurring?: boolean;
+  frequency?: "daily" | "weekly" | "monthly";
 }
 
 type RawEvent = Omit<ExtractedEvent, "kidId">;
@@ -49,12 +51,19 @@ Extract every UPCOMING test, activity, or event that has a specific date.
 Skip items that are already completed or have no date.
 If nothing upcoming is found, return an empty array [].
 
+RECURRING EVENTS: If an event repeats on a regular schedule (e.g. "every Friday", "daily", "every week", "every Monday and Wednesday"):
+- Return ONLY ONE event object for the FIRST upcoming occurrence — do NOT generate multiple dates.
+- Set recurring: true and frequency: "weekly", "daily", or "monthly".
+- For "every Monday and Wednesday", return TWO objects (one per day), each with recurring: true and frequency: "weekly".
+
 Return ONLY a valid JSON array. Each element must have exactly these keys:
 - subject: string (e.g. "Maths", "English", "EVS", "Malayalam", "Hindi", "General")
 - title: string (short calendar event title in English)
 - description: string (notes, items to bring, etc. — empty string if none)
-- date: string (YYYY-MM-DD)
+- date: string (YYYY-MM-DD, first occurrence only for recurring events)
 - type: one of "Test", "Activity", "Homework", "Event"
+- recurring: boolean (true if event repeats on a schedule, false or omit otherwise)
+- frequency: "daily" | "weekly" | "monthly" (only set when recurring is true)
 
 Message:
 ${text}`;
@@ -80,7 +89,11 @@ ${text}`;
         const raw = JSON.parse(responseText) as RawEvent[];
         return raw.filter(
           (e) => e.title && e.date && /^\d{4}-\d{2}-\d{2}$/.test(e.date)
-        );
+        ).map((e) => ({
+          ...e,
+          recurring: e.recurring === true ? true : undefined,
+          frequency: e.recurring === true ? e.frequency : undefined,
+        }));
       } catch {
         return [];
       }

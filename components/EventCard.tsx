@@ -51,6 +51,11 @@ export default function EventCard({ event, kids, onUpdate, onDelete }: Props) {
           <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
             {event.subject}
           </span>
+          {event.recurring && (
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-violet-100 text-violet-700">
+              🔄 {event.frequency === "daily" ? "Daily" : event.frequency === "monthly" ? "Monthly" : "Weekly"}
+            </span>
+          )}
         </div>
 
         {/* Date picker */}
